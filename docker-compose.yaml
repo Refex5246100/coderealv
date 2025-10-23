@@ -1,0 +1,65 @@
+# บรรทัด version ไม่จำเป็นแล้ว สามารถลบทิ้งได้
+services:
+  # --- ส่วนของ Backend ---
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_db
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: power_sensor
+      MYSQL_USER: power_user
+      MYSQL_PASSWORD: power_password
+      TZ: Asia/Bangkok
+    volumes:
+      - db_data:/var/lib/mysql
+      # ตรวจสอบให้แน่ใจว่าไฟล์ power_sensor.sql อยู่ในโฟลเดอร์ backend_iot_2568
+      - ./backend_iot_2568/power_sensor.sql:/docker-entrypoint-initdb.d/power_sensor.sql
+    restart: always
+
+  backend: # <-- นี่คือ "ชื่อ service" ของ backend
+    build: 
+      context: ./backend_iot_2568 
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend_iot_2568:/usr/src/app
+      - /usr/src/app/node_modules
+    env_file:
+      - ./backend_iot_2568/.env
+    depends_on:
+      - mysql
+    restart: always
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql
+      MYSQL_ROOT_PASSWORD: rootpassword
+    depends_on:
+      - mysql
+    restart: always
+
+  # --- ส่วนของ Frontend ---
+  frontend:
+    build: 
+      context: ./fronend_iot_2568
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./fronend_iot_2568:/app
+      - /app/node_modules
+    environment:
+      API_BASE: http://backend:4000
+    depends_on:
+      # ✅✅✅ จุดที่แก้ไข: ต้องใช้ "ชื่อ service" ไม่ใช่ "ชื่อโฟลเดอร์"
+      - backend 
+    restart: always
+
+# --- ส่วนของการประกาศ Volume ---
+volumes:
+  db_data:
